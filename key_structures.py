@@ -56,7 +56,7 @@ class select_collector:
         self.counter = 0
 
 class collector:
-    def __init__(self, names_dict : names_dict, answers_dict :answers_dict):
+    def __init__(self,  names_dict : names_dict, answers_dict :answers_dict):
         with open("resources\\survey_structure.json", "r", encoding = "utf-8") as tmp_input:
             self.__survey_structure = json.load(tmp_input)
         self.__answers_dict = answers_dict
