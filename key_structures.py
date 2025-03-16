@@ -38,37 +38,57 @@ class names_dict:
         name = re.split('[ \t,;\:\-\.\!\?]+', name)
         name = [i.lower() for i in name]
         return frozenset(name)
-
-class number_collector:
-    def __init__(self):
-        self.sum = 0
-        self.counter = 0
-
-class free_collector:
-    def __init__(self):
-        self.feedback = []
-
-class select_collector:
-    def __init__(self, question : str, answers : answers_dict):
-        self.answers = dict()
-        for _, key_value in answers[question].items():
-            answers[key_value] = 0
-        self.counter = 0
-
+        
 class collector:
-    def __init__(self,  names_dict : names_dict, answers_dict :answers_dict):
-        with open("resources\\survey_structure.json", "r", encoding = "utf-8") as tmp_input:
-            self.__survey_structure = json.load(tmp_input)
-        self.__answers_dict = answers_dict
-        self.__names_dict = answers_dict
+    class number_collector:
+        def __init__(self):
+            self.sum = 0
+            self.counter = 0
+        
+        def add_info(self, value):
+            self.sum += value
+            self.counter += 1
+
+    class free_collector:
+        def __init__(self):
+            self.feedback = []
+
+        def add_info(self, value):
+            self.feedback.append(value)
+
+    class select_collector:
+        def __init__(self, question : str, answers : answers_dict):
+            self.answers = dict()
+            for _, key_value in answers[question].items():
+                self.answers[key_value] = 0
+            self.counter = 0
+
+        def add_info(self, value):
+            self.answers[value] += 1
+            self.counter += 1
+
+    def __init__(self, survey_structure, group_name : str, names_dict : names_dict, answers_dict :answers_dict):
+        self.__group_structure = survey_structure["groups"][group_name]
+        
         self.__names = dict()
+        word = "as"
+        if word == "name":
+            pass
+
+    def process_row(self, row : pd.Series):
+        pass   
 
     def print_groups(self):
         data = pd.read_excel("resources\\data.xlsx")
         for group, indexes in self.__survey_structure["groups"].items():
             print(data[data.columns[indexes]])
 
-    
+    #def (self):
+
+
+with open("resources\\survey_structure.json", "r", encoding = "utf-8") as tmp_input:
+        survey_structure = json.load(tmp_input)
+
 sys.stdout.reconfigure(encoding = 'utf-8')
 in_str = "ахматова екатерина"
 x = answers_dict("resources\\keys.xlsx")
@@ -78,3 +98,4 @@ z.print_groups()
 print(x.get_answer_key_value("6. Способствует ли руководитель вашему развитию?","Скорее да, периодически ведется работа в этом направлении"))
 print(x.get_answer_key_value("12. Как вы оцениваете эмоциональный вклад руководителя?","Общая демотивация"))
 print(y.get_name(in_str))
+
