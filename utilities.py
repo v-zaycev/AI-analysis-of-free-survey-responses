@@ -44,6 +44,7 @@ class free_collector:
 class select_collector:
     def __init__(self, default_value, question_info : dict):
         self.default_value = default_value
+        self.question_info = question_info
         self.answers = dict()
         if type(question_info[2]) == list:
             for value in question_info[2]:
