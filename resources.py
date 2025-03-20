@@ -135,20 +135,3 @@ report_data = {2: "Помощь в решении проблемных вопр�
                19: "Эмоциональный настрой в команде",
                21: "Предоставление информации по ключевым изминениям в компании"}
 
-
-import plotly.graph_objects as go
-from docx import Document
-from docx.shared import Inches
-
-
-document = Document()
-
-fig = go.Figure(go.Bar(
-            x=[20, 14, 23],
-            y=['giraffes', 'orangutans', 'monkeys'],
-            orientation='h'))
-fig.write_image("fig1.png")
-
-document.add_picture("fig1.png", width=Inches(8))
-
-document.save('demo.docx')
