@@ -14,7 +14,7 @@ async def summarize(reviews) -> str:
     messages = [
         {
             "role": "system",
-            "text": "Проанализируй отзывы о руководителе, пронумерованные с 1, и составь краткую обратную связь по пунктам. Первый пункт должен быть самым актуальным и важным. Вывод должен быть кратким.",
+            "text": "Проанализируй отзывы о руководителе и составь краткую обратную связь. Результат должен быть оформлен по пунктам, каждый из которых отражает ключевой аспект из отзывов.",
         },
         {
             "role": "user",
@@ -23,10 +23,7 @@ async def summarize(reviews) -> str:
     ]
 
     result = await model.configure(
-        temperature=0.7
+        temperature=0.5
     ).run(messages)
 
     return result[0].text
-
-# if __name__ == '__main__':
-#     print(asyncio.run(summarize("how to calculate the Hirsch index in O(N)")))
