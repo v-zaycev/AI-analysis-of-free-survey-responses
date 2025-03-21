@@ -1,5 +1,16 @@
 import pandas as pd
 import re
+from natasha import (
+    Segmenter,
+    MorphVocab,
+    NewsEmbedding,
+    NewsMorphTagger,
+    NewsSyntaxParser,
+    NewsNERTagger,
+    PER,
+    NamesExtractor,
+    Doc
+)
 
 class names_dict:
     def __init__(self, filename : str):
@@ -28,7 +39,7 @@ class number_collector:
         self.counter = 0
     
     def add_info(self, value):
-        if value != self.default_value:
+        if value is not None and value != self.default_value:
             self.sum += value
             self.counter += 1
 
@@ -38,7 +49,7 @@ class free_collector:
         self.feedback = []
 
     def add_info(self, value):
-        if value != self.default_value:
+        if value is not None and value != self.default_value:
             self.feedback.append(value)
 
 class select_collector:
@@ -54,7 +65,7 @@ class select_collector:
                 self.answers[value] = 0
         self.counter = 0
 
-    def add_info(self, answer : str):
+    def add_info(self, answer):
         if type(self.question_info[2]) == list:
             if answer in self.answers:
                 self.answers[answer] += 1

@@ -1,95 +1,99 @@
-import pandas as pd
-import re
-from generate_text import summarize
-from resources import questions_data, empty_collector, levels, full_names, report_data
+import json
 import copy
 import asyncio
-from docx import Document
-from docx.shared import Inches
-import plotly.graph_objects as go
-
+import pandas as pd
+#from generate_text import summarize
+from resources import questions_data, empty_collector, levels, full_names, report_data
+#from docx import Document
+#from docx import Inches
+#import plotly.graph_objects as go
+from utilities import names_dict, select_collector, number_collector, free_collector
 
 class Preprocessing:
-    def __init__(self, path):
-        self.poll_data = pd.read_excel(path).dropna(subset=[questions_data[1]["column_name"], questions_data[9]["column_name"], questions_data[16]["column_name"]])
+    def __init__(self, data_path : str, structure_path : str, names_path : str):
+        self.__survey_data = pd.read_excel(data_path)
+        self.__names = names_dict(names_path)
+        with open(structure_path, "r", encoding = "utf-8") as tmp_input:
+            self.__survey_structure = json.load(tmp_input)    
+            new_fields = dict()
+            for key, value in self.__survey_structure["fields"].items():
+                new_fields[int(key)] = value
+            self.__survey_structure["fields"] = new_fields
+            new_output_headers = dict()
+            for key, value in self.__survey_structure["output headers"].items():
+                new_output_headers[int(key)] = value
+            self.__survey_structure["output headers"] = new_output_headers
+
+        self.__questions_to_indexes = dict()
+        for key, value in self.__survey_structure["fields"].items():
+                self.__questions_to_indexes[key] = value
+        self.__create_person_template()
+        self.__collector = dict()
 
     def collect(self):
-        def get_initials(arr):
-            return [word[0] for word in arr]
+        questions = self.__survey_structure["fields"]
+        for _, row in self.__survey_data.iterrows():
+            for _, columns in self.__survey_structure["groups"].items():
+                group_structure = self.__create_group_structure(columns)
 
-        def record_respond():
-            nonlocal level, name, collector, row
-            for question in levels[level]["relevant_questions"]:
-                if questions_data[question]["type"] == "number":
-                    try:
-                        collector[name][question]["value"] += int(row[questions_data[question]["column_name"]])
-                    except ValueError:
-                        continue
-                    else:
-                        collector[name][question]["quantity"] += 1
-                elif questions_data[question]["type"] == "select":
-                    try:
-                        collector[name][question]["value"] += questions_data[question]["estimate"][str(row[questions_data[question]["column_name"]])]
-                    except ValueError:
-                        continue
-                    except KeyError:
-                        continue
-                    else:
-                        collector[name][question]["quantity"] += 1
-                else:
-                    try:
-                        free_respond = str(row[questions_data[question]["column_name"]])
-                    except ValueError:
-                        continue
-                    else:
-                        if len(re.findall('[а-я]+', free_respond)) > 0:
-                            collector[name][question].append(free_respond)
-
-        collector = {}
-        for index, row in self.poll_data.iterrows():
-            for level in levels.keys():
-                name = re.findall('[а-я]+', row[questions_data[levels[level]["full_name"]]["column_name"]].lower())
-                if len(name) > 3 or len(name) == 0:
+                valid_flag = True
+                if "check" in group_structure:
+                    for index in group_structure["check"]:
+                        question = questions[index][1]
+                        answer =  row[question]
+                        if answer not in questions[index][2] or questions[index][2][answer] != 1:
+                            valid_flag = False
+                if not valid_flag:
                     continue
 
-                initials = []
-                for i in range(len(name) - 1, -1, -1):
-                    if len(name[i]) == 1:
-                        initials.append(name[i])
-                        name.pop(i)
-
-                intersect = []
-                name = set(name)
-
-                if len(initials) > 0:
-                    initials.sort()
-                    for full_name in full_names.keys():
-                        if full_name.issuperset(name):
-                            fn_initials = sorted(get_initials(set(full_name) - name))
-                            counter = 0
-                            for i in range(len(fn_initials)):
-                                if fn_initials[i] == initials[counter]:
-                                    counter += 1
-                                    if counter == len(initials):
-                                        intersect.append(full_name)
-                                        break
+                name_column_number = group_structure["name"][0]
+                name_column_question = questions[name_column_number][1]
+                raw_name = row[name_column_question].strip()
+                names = self.__names.get_names(raw_name)
+                if len(names) != 1:
+                    continue
                 else:
-                    for full_name in full_names.keys():
-                        if full_name.issuperset(name):
-                            intersect.append(full_name)
+                    name = names[0]
 
-                if len(intersect) == 1:
-                    name = intersect[0]
-                else:
-                    name = frozenset(name)
+                if name not in self.__collector:
+                    self.__collector[name] = copy.deepcopy(self.__person_template)
+                group_structure.pop("name", None)
+                group_structure.pop("check", None)
+                for type in group_structure:
+                    for index in group_structure[type]:
+                        self.__collector[name][index][1].add_info(row[questions[index][1]])
 
-                if name not in collector:
-                    collector[name] = copy.deepcopy(empty_collector)
-                record_respond()
+    def create_report_df(self, group_name : str):
+        if group_name is None:
+            pass
+        elif group_name in self.__survey_structure["groups"]:
+            columns_numbers = sorted(self.__survey_structure["groups"][group_name])
+            columns_names = ["Имя"]
+            for index in columns_numbers:
+                if index in self.__survey_structure["output headers"]:
+                    columns_names.append(self.__survey_structure["output headers"][index])
+                elif index in self.__person_template:
+                    columns_names.append(self.__person_template[index][0])
+            df = pd.DataFrame(columns=columns_names)
 
-        return self.free_responses(self.numeric_responses(collector))
-
-
+            for name, person_data in self.__collector.items():
+                cur_row = [name]
+                for index, info in person_data.items():
+                    if index not in columns_numbers:
+                        continue
+                    if type(info[1]) == select_collector:
+                        cur_row.append("" if info[1].counter == 0 else info[1].answers[1] / info[1].counter)
+                    elif type(info[1]) == number_collector:
+                        cur_row.append("" if info[1].counter == 0 else info[1].sum / info[1].counter)
+                    elif type(info[1]) == free_collector:
+                        cur_row.append("\n".join(info[1].feedback))
+                df = pd.concat([df, pd.DataFrame(data=[cur_row], columns=columns_names)], ignore_index=True)
+            return df
+        else:
+            pass
+            
+        
+    
 
     def free_responses(self, collector):
         def to_summarize(name, question):
@@ -117,8 +121,8 @@ class Preprocessing:
 
         return collector
 
-    def to_csv(self, collector):
-        return pd.DataFrame.from_dict(collector, orient='index')
+    def to_csv(self, filename):
+        pd.DataFrame.from_dict(self.__collector, orient='index').to_csv(filename)
 
     def get_mean(self, collector):
         counter = 0
@@ -176,12 +180,35 @@ class Preprocessing:
                 document.add_page_break()
             document.save(f'{fn}.docx')
 
+    def __create_person_template(self):
+        self.__person_template = dict()
+        for number, info in self.__survey_structure["fields"].items():
+            if info[0] == "number":
+                self.__person_template[number] = [info[1], number_collector("-")] 
+            elif info[0] == "select":
+                self.__person_template[number] = [info[1], select_collector("-", info)] 
+            elif info[0] == "free":
+                self.__person_template[number] = [info[1], free_collector("-")]
+    
+    def __create_group_structure(self, columns : list) -> dict:
+        group_structure = dict()
+        for index in columns:
+            if self.__survey_structure["fields"][index][0] not in group_structure:
+                group_structure[self.__survey_structure["fields"][index][0]] = [index]
+            else:
+                group_structure[self.__survey_structure["fields"][index][0]].append(index)
+        return group_structure
 
 if __name__ == '__main__':
-    path = input("Please, enter path to xlsx file:")
-    prep = Preprocessing(path)
-    collector = prep.collect()
-    prep.to_report(collector)
-    print(collector)
+    data_path = "data.xlsx"
+    structure_path = "resources\\survey_structure.json"
+    names_path = "resources\\names.xlsx"
+    #path = input("Please, enter path to xlsx file:")
+    Prep = Preprocessing(data_path, structure_path, names_path)
+    Prep.collect()
+    Prep.create_report_df("Непосредственный руководитель").to_excel("output.xlsx", index=False)
+#    collector = prep.collect()
+#    prep.to_report(collector)
+#    print(collector)
 
 
