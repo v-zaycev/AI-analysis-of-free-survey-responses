@@ -95,90 +95,90 @@ class Preprocessing:
         
     
 
-    def free_responses(self, collector):
-        def to_summarize(name, question):
-            if len(collector[name][question]) > 0:
-                reviews = ""
-                for i in range(len(collector[name][question])):
-                    reviews += f"{i + 1}: {collector[name][question][i]}\n"
-                return asyncio.run(summarize(reviews))
+    # def free_responses(self, collector):
+    #     def to_summarize(name, question):
+    #         if len(collector[name][question]) > 0:
+    #             reviews = ""
+    #             for i in range(len(collector[name][question])):
+    #                 reviews += f"{i + 1}: {collector[name][question][i]}\n"
+    #             return asyncio.run(summarize(reviews))
 
-        for name in collector.keys():
-            collector[name][8] = to_summarize(name, 8)
-            collector[name][14] = to_summarize(name, 14)
-            collector[name][22] = to_summarize(name, 22)
+    #     for name in collector.keys():
+    #         collector[name][8] = to_summarize(name, 8)
+    #         collector[name][14] = to_summarize(name, 14)
+    #         collector[name][22] = to_summarize(name, 22)
 
-        return collector
+    #     return collector
 
-    def numeric_responses(self, collector):
-        for name in collector.keys():
-            for question in collector[name].keys():
-                if type(collector[name][question]) is dict:
-                    if collector[name][question]["quantity"] < 1:
-                        collector[name][question] = None
-                    else:
-                        collector[name][question] = round(collector[name][question]["value"] / collector[name][question]["quantity"], 1)
+    # def numeric_responses(self, collector):
+    #     for name in collector.keys():
+    #         for question in collector[name].keys():
+    #             if type(collector[name][question]) is dict:
+    #                 if collector[name][question]["quantity"] < 1:
+    #                     collector[name][question] = None
+    #                 else:
+    #                     collector[name][question] = round(collector[name][question]["value"] / collector[name][question]["quantity"], 1)
 
-        return collector
+    #     return collector
 
-    def to_csv(self, filename):
-        pd.DataFrame.from_dict(self.__collector, orient='index').to_csv(filename)
+    # def to_csv(self, filename):
+    #     pd.DataFrame.from_dict(self.__collector, orient='index').to_csv(filename)
 
-    def get_mean(self, collector):
-        counter = 0
-        s = 0
-        for name in collector.keys():
-            if collector[name][4] is not None:
-                s += collector[name][4]
-                counter += 1
-            if collector[name][11] is not None:
-                s += collector[name][11]
-                counter += 1
-            if collector[name][20] is not None:
-                s += collector[name][20]
-                counter += 1
-        return round(s / counter, 1)
+    # def get_mean(self, collector):
+    #     counter = 0
+    #     s = 0
+    #     for name in collector.keys():
+    #         if collector[name][4] is not None:
+    #             s += collector[name][4]
+    #             counter += 1
+    #         if collector[name][11] is not None:
+    #             s += collector[name][11]
+    #             counter += 1
+    #         if collector[name][20] is not None:
+    #             s += collector[name][20]
+    #             counter += 1
+    #     return round(s / counter, 1)
 
-    def to_report(self, collector):
-        for name in collector.keys():
-            document = Document()
+    # def to_report(self, collector):
+    #     for name in collector.keys():
+    #         document = Document()
 
-            if name in full_names:
-                fn = full_names[name]
-            else:
-                fn = ' '.join(map(lambda x: x.capitalize(), list(name)))
+    #         if name in full_names:
+    #             fn = full_names[name]
+    #         else:
+    #             fn = ' '.join(map(lambda x: x.capitalize(), list(name)))
 
-            document.add_heading(fn, 0)
+    #         document.add_heading(fn, 0)
 
-            document.add_paragraph(f"Cредний урочень оценок: {self.get_mean(collector)}")
-            for level in levels:
-                graph = {"x": [], "y": []}
-                document.add_paragraph(f"Уровень подчинения: {level}", style='Intense Quote')
-                for question in sorted(list(levels[level]["relevant_questions"])):
-                    if questions_data[question]["type"] == "number":
-                        if collector[name][question] is not None:
-                            document.add_paragraph(f"Средняя оценка по уровню: {collector[name][question]}")
-                        else:
-                            document.add_paragraph("Недостаточно оценок")
-                    elif questions_data[question]["type"] == "select":
-                        if collector[name][question] is not None:
-                            graph["x"].append(collector[name][question])
-                            graph["y"].append(report_data[question])
-                    else:
-                        if collector[name][question] is not None:
-                            document.add_paragraph(f"Cуммаризированные отзывы с свободным ответом: {collector[name][question]}")
-                        else:
-                            document.add_paragraph("Недостаточно отзывов с свободным ответом")
+    #         document.add_paragraph(f"Cредний урочень оценок: {self.get_mean(collector)}")
+    #         for level in levels:
+    #             graph = {"x": [], "y": []}
+    #             document.add_paragraph(f"Уровень подчинения: {level}", style='Intense Quote')
+    #             for question in sorted(list(levels[level]["relevant_questions"])):
+    #                 if questions_data[question]["type"] == "number":
+    #                     if collector[name][question] is not None:
+    #                         document.add_paragraph(f"Средняя оценка по уровню: {collector[name][question]}")
+    #                     else:
+    #                         document.add_paragraph("Недостаточно оценок")
+    #                 elif questions_data[question]["type"] == "select":
+    #                     if collector[name][question] is not None:
+    #                         graph["x"].append(collector[name][question])
+    #                         graph["y"].append(report_data[question])
+    #                 else:
+    #                     if collector[name][question] is not None:
+    #                         document.add_paragraph(f"Cуммаризированные отзывы с свободным ответом: {collector[name][question]}")
+    #                     else:
+    #                         document.add_paragraph("Недостаточно отзывов с свободным ответом")
 
-                fig = go.Figure(go.Bar(
-                    x=graph["x"],
-                    y=graph["y"],
-                    orientation='h'))
-                fig.write_image("fig.png")
-                document.add_picture("fig.png", width=Inches(8))
+    #             fig = go.Figure(go.Bar(
+    #                 x=graph["x"],
+    #                 y=graph["y"],
+    #                 orientation='h'))
+    #             fig.write_image("fig.png")
+    #             document.add_picture("fig.png", width=Inches(8))
 
-                document.add_page_break()
-            document.save(f'{fn}.docx')
+    #             document.add_page_break()
+    #         document.save(f'{fn}.docx')
 
     def __create_person_template(self):
         self.__person_template = dict()
