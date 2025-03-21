@@ -43,6 +43,10 @@ class number_collector:
             self.sum += value
             self.counter += 1
 
+    def __iadd__(self, other):
+        self.sum += other.sum
+        self.counter += other.counter
+
 class free_collector:
     def __init__(self, default_value):
         self.default_value = default_value
@@ -50,7 +54,7 @@ class free_collector:
 
     def add_info(self, value):
         if value is not None and value != self.default_value:
-            self.feedback.append(value)
+            self.feedback.append(str(value))
 
 class select_collector:
     def __init__(self, default_value, question_info : dict):

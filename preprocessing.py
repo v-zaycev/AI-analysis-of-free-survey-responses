@@ -2,8 +2,8 @@ import json
 import copy
 import asyncio
 import pandas as pd
+from typing import Optional
 #from generate_text import summarize
-from resources import questions_data, empty_collector, levels, full_names, report_data
 #from docx import Document
 #from docx import Inches
 #import plotly.graph_objects as go
@@ -63,34 +63,49 @@ class Preprocessing:
                     for index in group_structure[type]:
                         self.__collector[name][index][1].add_info(row[questions[index][1]])
 
-    def create_report_df(self, group_name : str):
+    def create_report_df(self, group_name : Optional[str] = None):
         if group_name is None:
-            pass
+            columns_numbers = sorted(self.__survey_structure["fields"].keys())
         elif group_name in self.__survey_structure["groups"]:
             columns_numbers = sorted(self.__survey_structure["groups"][group_name])
-            columns_names = ["Имя"]
-            for index in columns_numbers:
-                if index in self.__survey_structure["output headers"]:
-                    columns_names.append(self.__survey_structure["output headers"][index])
-                elif index in self.__person_template:
-                    columns_names.append(self.__person_template[index][0])
-            df = pd.DataFrame(columns=columns_names)
-
-            for name, person_data in self.__collector.items():
-                cur_row = [name]
-                for index, info in person_data.items():
-                    if index not in columns_numbers:
-                        continue
-                    if type(info[1]) == select_collector:
-                        cur_row.append("" if info[1].counter == 0 else info[1].answers[1] / info[1].counter)
-                    elif type(info[1]) == number_collector:
-                        cur_row.append("" if info[1].counter == 0 else info[1].sum / info[1].counter)
-                    elif type(info[1]) == free_collector:
-                        cur_row.append("\n".join(info[1].feedback))
-                df = pd.concat([df, pd.DataFrame(data=[cur_row], columns=columns_names)], ignore_index=True)
-            return df
         else:
-            pass
+            return None
+        
+        columns_names = ["Имя"]
+        for index in columns_numbers:
+            if index in self.__survey_structure["output headers"]:
+                columns_names.append(self.__survey_structure["output headers"][index])
+            elif index in self.__person_template:
+                columns_names.append(self.__person_template[index][0])
+        if group_name is None and not self.__survey_structure["merge"]:
+            for columns_name in self.__survey_structure["merge"].keys():
+                columns_names.append(columns_name)
+        df = pd.DataFrame(columns=columns_names)
+
+        for name, person_data in self.__collector.items():
+            cur_row = [name]
+            for index, info in person_data.items():
+                if index not in columns_numbers:
+                    continue
+                if type(info[1]) == select_collector:
+                    cur_row.append(None if info[1].counter == 0 else info[1].answers[1] / info[1].counter)
+                elif type(info[1]) == number_collector:
+                    cur_row.append(None if info[1].counter == 0 else info[1].sum / info[1].counter)
+                elif type(info[1]) == free_collector:
+                    cur_row.append("\n".join(info[1].feedback))
+            if group_name is None and not self.__survey_structure["merge"]:
+                for _, merge_columns in self.__survey_structure["merge"].items():
+                    merge_result = number_collector("-")
+                    for index in merge_columns:
+                        merge_result += self.__collector[name][1]
+                    cur_row.append(None if merge_result.counter == 0 else merge_result.sum / merge_result.counter)
+            
+            if df.empty:
+                df = pd.DataFrame(data=[cur_row], columns=columns_names)
+            else:
+                df = pd.concat([df, pd.DataFrame(data=[cur_row], columns=columns_names)], ignore_index=True)
+
+        return df
             
         
     
@@ -207,6 +222,7 @@ if __name__ == '__main__':
     Prep = Preprocessing(data_path, structure_path, names_path)
     Prep.collect()
     Prep.create_report_df("Непосредственный руководитель").to_excel("output.xlsx", index=False)
+    Prep.create_report_df().to_excel("output2.xlsx", index=False)
 #    collector = prep.collect()
 #    prep.to_report(collector)
 #    print(collector)
