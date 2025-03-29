@@ -8,6 +8,7 @@ from typing import Optional
 #from docx import Inches
 #import plotly.graph_objects as go
 from utilities import names_dict, select_collector, number_collector, free_collector
+import sys
 
 class Preprocessing:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
@@ -63,7 +64,7 @@ class Preprocessing:
                     for index in group_structure[type]:
                         self.__collector[name][index][1].add_info(row[questions[index][1]])
 
-    def create_report_df(self, group_name : Optional[str] = None):
+    def create_report_df(self, group_name : Optional[str] = None) -> pd.DataFrame:
         if group_name is None:
             columns_numbers = sorted(self.__survey_structure["fields"].keys())
         elif group_name in self.__survey_structure["groups"]:
@@ -73,14 +74,12 @@ class Preprocessing:
         
         columns_names = ["Имя"]
         for index in columns_numbers:
-            if index in self.__survey_structure["output headers"]:
-                columns_names.append(self.__survey_structure["output headers"][index])
-            elif index in self.__person_template:
+            if index in self.__person_template:
                 columns_names.append(self.__person_template[index][0])
         if group_name is None and not self.__survey_structure["merge"]:
             for columns_name in self.__survey_structure["merge"].keys():
                 columns_names.append(columns_name)
-        df = pd.DataFrame(columns=columns_names)
+        df = pd.DataFrame(columns = columns_names)
 
         for name, person_data in self.__collector.items():
             cur_row = [name]
@@ -101,15 +100,62 @@ class Preprocessing:
                     cur_row.append(None if merge_result.counter == 0 else merge_result.sum / merge_result.counter)
             
             if df.empty:
-                df = pd.DataFrame(data=[cur_row], columns=columns_names)
+                df = pd.DataFrame(data=[cur_row], columns = columns_names)
             else:
-                df = pd.concat([df, pd.DataFrame(data=[cur_row], columns=columns_names)], ignore_index=True)
+                df = pd.concat([df, pd.DataFrame(data=[cur_row], columns = columns_names)], ignore_index = True)
 
         return df
-            
+
+    def get_person_info(self, name : str, group_name : Optional[str] =  None) -> pd.Series:
+
+        #add name check
+
+        if group_name is None:
+            columns_numbers = sorted(self.__survey_structure["fields"].keys())
+        elif group_name in self.__survey_structure["groups"]:
+            columns_numbers = sorted(self.__survey_structure["groups"][group_name])
+        else:
+            return None
+        
+        # columns_names = list()
+        # for index in columns_numbers:
+        #     if index in self.__person_template:
+        #         columns_names.append(self.__person_template[index][0])
+        # if group_name is None and not self.__survey_structure["merge"]:
+        #     for columns_name in self.__survey_structure["merge"].keys():
+        #         columns_names.append(columns_name)
+
+        
+        person_data = self.__collector[name]
+        columns_names = list()
+        columns_data = list()
+        for index, info in person_data.items():
+            if index not in columns_numbers:
+                continue
+            columns_names.extend(info[1].get_columns_names(info[0]))
+            columns_data.extend(info[1].get_columns_values())
+        if group_name is None and not self.__survey_structure["merge"]:
+            for merge_name, merge_columns in self.__survey_structure["merge"].items():
+                merge_result = number_collector("-")
+                for index in merge_columns:
+                    merge_result += self.__collector[name][1]
+            columns_names.extend(merge_result.get_columns_names(merge_name))
+            columns_data.extend(merge_result.get_columns_values())
+
+        return pd.Series(columns_data, index = columns_names)         
+
+    def get_select_vals_for_plot(self, name : str, group_name : str) -> tuple:
+        group_structure = self.__create_group_structure(self.__survey_structure["groups"][group_name])
+        names = list()
+        vals = list()
+        for index in group_structure["select"]:
+            names.append(self.__collector[name][index][0])
+            positive_pct = round(self.__collector[name][index][1].get_columns_values()[0],2)
+            vals.append([positive_pct, round(1 - positive_pct,2)])
+        return (names, vals)
+        
         
     
-
     # def free_responses(self, collector):
     #     def to_summarize(name, question):
     #         if len(collector[name][question]) > 0:
@@ -195,15 +241,20 @@ class Preprocessing:
     #             document.add_page_break()
     #         document.save(f'{fn}.docx')
 
-    def __create_person_template(self):
+    def __create_person_template(self, none_value = "-"):
         self.__person_template = dict()
-        for number, info in self.__survey_structure["fields"].items():
+        for index, info in self.__survey_structure["fields"].items():
+            if index in self.__survey_structure["output headers"]:
+                field_name = self.__survey_structure["output headers"][index]
+            else:
+                field_name = info[1]
+
             if info[0] == "number":
-                self.__person_template[number] = [info[1], number_collector("-")] 
+                self.__person_template[index] = [field_name, number_collector(none_value)] 
             elif info[0] == "select":
-                self.__person_template[number] = [info[1], select_collector("-", info)] 
+                self.__person_template[index] = [field_name, select_collector(none_value, info)] 
             elif info[0] == "free":
-                self.__person_template[number] = [info[1], free_collector("-")]
+                self.__person_template[index] = [field_name, free_collector(none_value)]
     
     def __create_group_structure(self, columns : list) -> dict:
         group_structure = dict()
@@ -221,8 +272,15 @@ if __name__ == '__main__':
     #path = input("Please, enter path to xlsx file:")
     Prep = Preprocessing(data_path, structure_path, names_path)
     Prep.collect()
-    Prep.create_report_df("Непосредственный руководитель").to_excel("output.xlsx", index=False)
-    Prep.create_report_df().to_excel("output2.xlsx", index=False)
+    Prep.create_report_df("Вышестоящий руководитель").to_excel("output.xlsx", index=False)
+    #Prep.create_report_df().to_excel("output2.xlsx", index=False)
+    sys.stdout.reconfigure(encoding='utf-8')
+
+    print(Prep.get_person_info("Денис Суворов"))#["Помощь в решении проблемных вопросов_positive"]
+    print()
+    print(Prep.get_person_info("Илюхина Мария", "Непосредственный руководитель"))
+    person_stat = Prep.get_select_vals_for_plot("Илюхина Мария", "Непосредственный руководитель")
+    print(person_stat)
 #    collector = prep.collect()
 #    prep.to_report(collector)
 #    print(collector)
