@@ -1,5 +1,7 @@
 import pandas as pd
 import re
+import asyncio
+from generate_text import summarize, async_summarize
 from natasha import (
     Segmenter,
     MorphVocab,
@@ -11,10 +13,6 @@ from natasha import (
     NamesExtractor,
     Doc
 )
-
-
-#как делить строки
-#
 
 class names_dict:
     def __init__(self, filename : str):
@@ -63,14 +61,17 @@ class free_collector:
         self.feedback = []
 
     def add_info(self, value):
-        if value is not None and value != self.default_value:
+        if value is not None and value != self.default_value and str(value).strip() != "":
             self.feedback.append(str(value))
 
     def get_columns_names(self, field_name :  str) -> list:
         return [field_name]
     
     def get_columns_values(self) -> list:
-        return ["\n".join(self.feedback)]
+        if len(self.feedback) != 0:
+            return [async_summarize("\n\n".join(self.feedback))]
+        else:
+            return [None]
     
 class select_collector:
     def __init__(self, default_value, question_info : dict):

@@ -3,10 +3,8 @@ import copy
 import asyncio
 import pandas as pd
 from typing import Optional
+from typing import Union
 #from generate_text import summarize
-#from docx import Document
-#from docx import Inches
-#import plotly.graph_objects as go
 from utilities import names_dict, select_collector, number_collector, free_collector
 import sys
 
@@ -91,7 +89,7 @@ class Preprocessing:
                 elif type(info[1]) == number_collector:
                     cur_row.append(None if info[1].counter == 0 else info[1].sum / info[1].counter)
                 elif type(info[1]) == free_collector:
-                    cur_row.append("\n".join(info[1].feedback))
+                    cur_row.extend(info[1].get_columns_values())
             if group_name is None and not self.__survey_structure["merge"]:
                 for _, merge_columns in self.__survey_structure["merge"].items():
                     merge_result = number_collector("-")
@@ -108,23 +106,18 @@ class Preprocessing:
 
     def get_person_info(self, name : str, group_name : Optional[str] =  None) -> pd.Series:
 
-        #add name check
-
+        candidates = self.__names.get_names(name)
+        if len(candidates) == 1:
+            name = candidates[0]
+        else:
+            return None
+            
         if group_name is None:
             columns_numbers = sorted(self.__survey_structure["fields"].keys())
         elif group_name in self.__survey_structure["groups"]:
             columns_numbers = sorted(self.__survey_structure["groups"][group_name])
         else:
             return None
-        
-        # columns_names = list()
-        # for index in columns_numbers:
-        #     if index in self.__person_template:
-        #         columns_names.append(self.__person_template[index][0])
-        # if group_name is None and not self.__survey_structure["merge"]:
-        #     for columns_name in self.__survey_structure["merge"].keys():
-        #         columns_names.append(columns_name)
-
         
         person_data = self.__collector[name]
         columns_names = list()
@@ -145,6 +138,15 @@ class Preprocessing:
         return pd.Series(columns_data, index = columns_names)         
 
     def get_select_vals_for_plot(self, name : str, group_name : str) -> tuple:
+        candidates = self.__names.get_names(name)
+        if len(candidates) == 1:
+            name = candidates[0]
+        else:
+            return None
+        
+        if group_name not in self.__survey_structure["groups"]:
+            return None
+
         group_structure = self.__create_group_structure(self.__survey_structure["groups"][group_name])
         names = list()
         vals = list()
@@ -153,94 +155,29 @@ class Preprocessing:
             positive_pct = round(self.__collector[name][index][1].get_columns_values()[0],2)
             vals.append([positive_pct, round(1 - positive_pct,2)])
         return (names, vals)
-        
-        
+
+    def get_average_rating(self, columns : Union[int, list[int]]):
+        if type(columns) == int:
+            mini_collector = number_collector("-")
+            for _, stats in self.__collector.items():
+                mini_collector.__iadd__(stats[columns][1])
+            return None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter
+        else:
+            overall_collector = number_collector("-")
+            mini_collector = number_collector("-")
+            result = dict()
+            for column in columns:
+                mini_collector = number_collector("-")
+                for _, stats in self.__collector.items():
+                    mini_collector.__iadd__(stats[column][1])
+                overall_collector.__iadd__(mini_collector)           
+                result[self.__person_template[column][0]] = (None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter)
+            result["Overall"] = (None if overall_collector.counter ==0 else overall_collector.sum /overall_collector.counter)
+            return result
     
-    # def free_responses(self, collector):
-    #     def to_summarize(name, question):
-    #         if len(collector[name][question]) > 0:
-    #             reviews = ""
-    #             for i in range(len(collector[name][question])):
-    #                 reviews += f"{i + 1}: {collector[name][question][i]}\n"
-    #             return asyncio.run(summarize(reviews))
-
-    #     for name in collector.keys():
-    #         collector[name][8] = to_summarize(name, 8)
-    #         collector[name][14] = to_summarize(name, 14)
-    #         collector[name][22] = to_summarize(name, 22)
-
-    #     return collector
-
-    # def numeric_responses(self, collector):
-    #     for name in collector.keys():
-    #         for question in collector[name].keys():
-    #             if type(collector[name][question]) is dict:
-    #                 if collector[name][question]["quantity"] < 1:
-    #                     collector[name][question] = None
-    #                 else:
-    #                     collector[name][question] = round(collector[name][question]["value"] / collector[name][question]["quantity"], 1)
-
-    #     return collector
-
-    # def to_csv(self, filename):
-    #     pd.DataFrame.from_dict(self.__collector, orient='index').to_csv(filename)
-
-    # def get_mean(self, collector):
-    #     counter = 0
-    #     s = 0
-    #     for name in collector.keys():
-    #         if collector[name][4] is not None:
-    #             s += collector[name][4]
-    #             counter += 1
-    #         if collector[name][11] is not None:
-    #             s += collector[name][11]
-    #             counter += 1
-    #         if collector[name][20] is not None:
-    #             s += collector[name][20]
-    #             counter += 1
-    #     return round(s / counter, 1)
-
-    # def to_report(self, collector):
-    #     for name in collector.keys():
-    #         document = Document()
-
-    #         if name in full_names:
-    #             fn = full_names[name]
-    #         else:
-    #             fn = ' '.join(map(lambda x: x.capitalize(), list(name)))
-
-    #         document.add_heading(fn, 0)
-
-    #         document.add_paragraph(f"Cредний урочень оценок: {self.get_mean(collector)}")
-    #         for level in levels:
-    #             graph = {"x": [], "y": []}
-    #             document.add_paragraph(f"Уровень подчинения: {level}", style='Intense Quote')
-    #             for question in sorted(list(levels[level]["relevant_questions"])):
-    #                 if questions_data[question]["type"] == "number":
-    #                     if collector[name][question] is not None:
-    #                         document.add_paragraph(f"Средняя оценка по уровню: {collector[name][question]}")
-    #                     else:
-    #                         document.add_paragraph("Недостаточно оценок")
-    #                 elif questions_data[question]["type"] == "select":
-    #                     if collector[name][question] is not None:
-    #                         graph["x"].append(collector[name][question])
-    #                         graph["y"].append(report_data[question])
-    #                 else:
-    #                     if collector[name][question] is not None:
-    #                         document.add_paragraph(f"Cуммаризированные отзывы с свободным ответом: {collector[name][question]}")
-    #                     else:
-    #                         document.add_paragraph("Недостаточно отзывов с свободным ответом")
-
-    #             fig = go.Figure(go.Bar(
-    #                 x=graph["x"],
-    #                 y=graph["y"],
-    #                 orientation='h'))
-    #             fig.write_image("fig.png")
-    #             document.add_picture("fig.png", width=Inches(8))
-
-    #             document.add_page_break()
-    #         document.save(f'{fn}.docx')
-
+    def get_top5(self, criterias : Union[int, list[int]]):
+        pass
+    
     def __create_person_template(self, none_value = "-"):
         self.__person_template = dict()
         for index, info in self.__survey_structure["fields"].items():
@@ -272,15 +209,18 @@ if __name__ == '__main__':
     #path = input("Please, enter path to xlsx file:")
     Prep = Preprocessing(data_path, structure_path, names_path)
     Prep.collect()
-    Prep.create_report_df("Вышестоящий руководитель").to_excel("output.xlsx", index=False)
+    #Prep.create_report_df("Вышестоящий руководитель").to_excel("output.xlsx", index=False)
     #Prep.create_report_df().to_excel("output2.xlsx", index=False)
     sys.stdout.reconfigure(encoding='utf-8')
 
-    print(Prep.get_person_info("Денис Суворов"))#["Помощь в решении проблемных вопросов_positive"]
-    print()
-    print(Prep.get_person_info("Илюхина Мария", "Непосредственный руководитель"))
-    person_stat = Prep.get_select_vals_for_plot("Илюхина Мария", "Непосредственный руководитель")
-    print(person_stat)
+
+    print(Prep.create_report_df())
+    # print(Prep.get_person_info("Денис Суворов"))#["Помощь в решении проблемных вопросов_positive"]
+    # print()
+    # print(Prep.get_person_info("Илюхина Мария", "Непосредственный руководитель"))
+    # person_stat = Prep.get_select_vals_for_plot("Илюхина Мария", "Непосредственный руководитель")
+    # print(person_stat)
+    print(Prep.get_average_rating(4))
 #    collector = prep.collect()
 #    prep.to_report(collector)
 #    print(collector)
