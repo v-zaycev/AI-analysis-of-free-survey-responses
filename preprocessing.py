@@ -1,10 +1,8 @@
 import json
 import copy
-import asyncio
 import pandas as pd
 from typing import Optional
 from typing import Union
-#from generate_text import summarize
 from utilities import names_dict, select_collector, number_collector, free_collector
 import sys
 
@@ -29,7 +27,9 @@ class Preprocessing:
         self.__create_person_template()
         self.__collector = dict()
 
-    def collect(self):
+    def collect(self) ->tuple:
+        names_counter = 0
+        unaccepted_names_counter = 0
         questions = self.__survey_structure["fields"]
         for _, row in self.__survey_data.iterrows():
             for _, columns in self.__survey_structure["groups"].items():
@@ -49,7 +49,10 @@ class Preprocessing:
                 name_column_question = questions[name_column_number][1]
                 raw_name = row[name_column_question].strip()
                 names = self.__names.get_names(raw_name)
+                names_counter += 1
                 if len(names) != 1:
+                    if (raw_name != "-"):
+                        unaccepted_names_counter+=1
                     continue
                 else:
                     name = names[0]
@@ -61,6 +64,8 @@ class Preprocessing:
                 for type in group_structure:
                     for index in group_structure[type]:
                         self.__collector[name][index][1].add_info(row[questions[index][1]])
+            
+        return (unaccepted_names_counter, names_counter)
 
     def create_report_df(self, group_name : Optional[str] = None) -> pd.DataFrame:
         if group_name is None:
