@@ -1,6 +1,6 @@
 import pandas as pd
 import re
-import asyncio
+import json
 from generate_text import summarize, async_summarize
 from natasha import (
     Segmenter,
@@ -65,13 +65,13 @@ class free_collector:
             self.feedback.append(str(value))
 
     def get_columns_names(self, field_name :  str) -> list:
-        return [field_name]
+        return [field_name + "_feedback", field_name + "_count"]
     
     def get_columns_values(self) -> list:
         if len(self.feedback) != 0:
-            return [async_summarize("\n\n".join(self.feedback))]
+            return [async_summarize("\n\n".join(self.feedback)), len(self.feedback)]
         else:
-            return [None]
+            return [None, 0]
     
 class select_collector:
     def __init__(self, default_value, question_info : dict):
@@ -96,10 +96,23 @@ class select_collector:
         self.counter += 1
     
     def get_columns_names(self, field_name :  str) -> list:
-        return [ field_name + "_positive_pct", field_name + "_all"]
+        return [ field_name + "_positive_pct", field_name + "_count"]
     
     def get_columns_values(self) -> list:
         if 1 in self.answers:
             return [0 if self.counter == 0 else self.answers[1] / self.counter,  self.counter]
         else:
             return [0, 0]
+        
+def read_survey_structure(file_name : str) -> dict:
+    with open(file_name, "r", encoding = "utf-8") as tmp_input:
+        survey_structure = json.load(tmp_input)    
+        new_fields = dict()
+        for key, value in survey_structure["fields"].items():
+            new_fields[int(key)] = value
+        survey_structure["fields"] = new_fields
+        new_output_headers = dict()
+        for key, value in survey_structure["output headers"].items():
+            new_output_headers[int(key)] = value
+        survey_structure["output headers"] = new_output_headers
+    return survey_structure

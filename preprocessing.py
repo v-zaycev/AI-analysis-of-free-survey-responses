@@ -3,31 +3,22 @@ import copy
 import pandas as pd
 from typing import Optional
 from typing import Union
-from utilities import names_dict, select_collector, number_collector, free_collector
+from utilities import names_dict, select_collector, number_collector, free_collector, read_survey_structure
 import sys
 
 class Preprocessing:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
         self.__survey_data = pd.read_excel(data_path)
         self.__names = names_dict(names_path)
-        with open(structure_path, "r", encoding = "utf-8") as tmp_input:
-            self.__survey_structure = json.load(tmp_input)    
-            new_fields = dict()
-            for key, value in self.__survey_structure["fields"].items():
-                new_fields[int(key)] = value
-            self.__survey_structure["fields"] = new_fields
-            new_output_headers = dict()
-            for key, value in self.__survey_structure["output headers"].items():
-                new_output_headers[int(key)] = value
-            self.__survey_structure["output headers"] = new_output_headers
-
+        self.__survey_structure = read_survey_structure(structure_path)
         self.__questions_to_indexes = dict()
+        
         for key, value in self.__survey_structure["fields"].items():
                 self.__questions_to_indexes[key] = value
         self.__create_person_template()
         self.__collector = dict()
 
-    def collect(self) ->tuple:
+    def collect(self) -> tuple:
         names_counter = 0
         unaccepted_names_counter = 0
         questions = self.__survey_structure["fields"]
@@ -49,10 +40,14 @@ class Preprocessing:
                 name_column_question = questions[name_column_number][1]
                 raw_name = row[name_column_question].strip()
                 names = self.__names.get_names(raw_name)
-                names_counter += 1
+                
+                if (raw_name != "-"):
+                    names_counter+=1
+                else:
+                    continue
+                
                 if len(names) != 1:
-                    if (raw_name != "-"):
-                        unaccepted_names_counter+=1
+                    unaccepted_names_counter += 1
                     continue
                 else:
                     name = names[0]
@@ -160,6 +155,17 @@ class Preprocessing:
             positive_pct = round(self.__collector[name][index][1].get_columns_values()[0],2)
             vals.append([positive_pct, round(1 - positive_pct,2)])
         return (names, vals)
+
+    def get_person_ratings(self, name : str) -> list:
+        candidates = self.__names.get_names(name)
+        if len(candidates) != 1:
+            return None
+        name = candidates[0]
+        ratings = list()
+        for question_nmb, data in self.__collector[name].items():
+            if type(data[1]) == number_collector:
+                ratings.append(data[1].get_columns_values())
+        return ratings
 
     def get_average_rating(self, columns : Union[int, list[int]]):
         if type(columns) == int:
