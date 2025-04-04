@@ -22,7 +22,7 @@ class Preprocessing:
         names_counter = 0
         unaccepted_names_counter = 0
         questions = self.__survey_structure["fields"]
-        for _, row in self.__survey_data.iterrows():
+        for row_index, row in self.__survey_data.iterrows():
             for _, columns in self.__survey_structure["groups"].items():
                 group_structure = self.__create_group_structure(columns)
 
@@ -41,12 +41,13 @@ class Preprocessing:
                 raw_name = row[name_column_question].strip()
                 names = self.__names.get_names(raw_name)
                 
-                if (raw_name != "-"):
-                    names_counter+=1
+                if (raw_name != self.__survey_structure["empty_value"]):
+                    names_counter += 1
                 else:
                     continue
                 
                 if len(names) != 1:
+                    print(f"row {row_index}: {name_column_question}\n  {raw_name}: {names}")
                     unaccepted_names_counter += 1
                     continue
                 else:
@@ -92,7 +93,7 @@ class Preprocessing:
                     cur_row.extend(info[1].get_columns_values())
             if group_name is None and not self.__survey_structure["merge"]:
                 for _, merge_columns in self.__survey_structure["merge"].items():
-                    merge_result = number_collector("-")
+                    merge_result = number_collector(self.__survey_structure["empty_value"])
                     for index in merge_columns:
                         merge_result += self.__collector[name][1]
                     cur_row.append(None if merge_result.counter == 0 else merge_result.sum / merge_result.counter)
@@ -129,7 +130,7 @@ class Preprocessing:
             columns_data.extend(info[1].get_columns_values())
         if group_name is None and not self.__survey_structure["merge"]:
             for merge_name, merge_columns in self.__survey_structure["merge"].items():
-                merge_result = number_collector("-")
+                merge_result = number_collector(self.__survey_structure["empty_value"])
                 for index in merge_columns:
                     merge_result += self.__collector[name][1]
             columns_names.extend(merge_result.get_columns_names(merge_name))
@@ -169,16 +170,16 @@ class Preprocessing:
 
     def get_average_rating(self, columns : Union[int, list[int]]):
         if type(columns) == int:
-            mini_collector = number_collector("-")
+            mini_collector = number_collector(self.__survey_structure["empty_value"])
             for _, stats in self.__collector.items():
                 mini_collector.__iadd__(stats[columns][1])
             return None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter
         else:
-            overall_collector = number_collector("-")
-            mini_collector = number_collector("-")
+            overall_collector = number_collector(self.__survey_structure["empty_value"])
+            mini_collector = number_collector(self.__survey_structure["empty_value"])
             result = dict()
             for column in columns:
-                mini_collector = number_collector("-")
+                mini_collector = number_collector(self.__survey_structure["empty_value"])
                 for _, stats in self.__collector.items():
                     mini_collector.__iadd__(stats[column][1])
                 overall_collector.__iadd__(mini_collector)           
@@ -189,7 +190,7 @@ class Preprocessing:
     def get_top5(self, criterias : Union[int, list[int]]):
         pass
     
-    def __create_person_template(self, none_value = "-"):
+    def __create_person_template(self):
         self.__person_template = dict()
         for index, info in self.__survey_structure["fields"].items():
             if index in self.__survey_structure["output headers"]:
@@ -198,11 +199,11 @@ class Preprocessing:
                 field_name = info[1]
 
             if info[0] == "number":
-                self.__person_template[index] = [field_name, number_collector(none_value)] 
+                self.__person_template[index] = [field_name, number_collector(self.__survey_structure["empty_value"])] 
             elif info[0] == "select":
-                self.__person_template[index] = [field_name, select_collector(none_value, info)] 
+                self.__person_template[index] = [field_name, select_collector(self.__survey_structure["empty_value"], info)] 
             elif info[0] == "free":
-                self.__person_template[index] = [field_name, free_collector(none_value)]
+                self.__person_template[index] = [field_name, free_collector(self.__survey_structure["empty_value"])]
     
     def __create_group_structure(self, columns : list) -> dict:
         group_structure = dict()
@@ -212,28 +213,3 @@ class Preprocessing:
             else:
                 group_structure[self.__survey_structure["fields"][index][0]].append(index)
         return group_structure
-
-if __name__ == '__main__':
-    data_path = "data.xlsx"
-    structure_path = "resources\\survey_structure.json"
-    names_path = "resources\\names.xlsx"
-    #path = input("Please, enter path to xlsx file:")
-    Prep = Preprocessing(data_path, structure_path, names_path)
-    Prep.collect()
-    #Prep.create_report_df("Вышестоящий руководитель").to_excel("output.xlsx", index=False)
-    #Prep.create_report_df().to_excel("output2.xlsx", index=False)
-    sys.stdout.reconfigure(encoding='utf-8')
-
-
-    print(Prep.create_report_df())
-    # print(Prep.get_person_info("Денис Суворов"))#["Помощь в решении проблемных вопросов_positive"]
-    # print()
-    # print(Prep.get_person_info("Илюхина Мария", "Непосредственный руководитель"))
-    # person_stat = Prep.get_select_vals_for_plot("Илюхина Мария", "Непосредственный руководитель")
-    # print(person_stat)
-    print(Prep.get_average_rating(4))
-#    collector = prep.collect()
-#    prep.to_report(collector)
-#    print(collector)
-
-

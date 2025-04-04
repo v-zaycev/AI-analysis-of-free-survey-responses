@@ -1,9 +1,6 @@
-# !/usr/bin/env python3
-
 from __future__ import annotations
 from yandex_cloud_ml_sdk import YCloudML, AsyncYCloudML
 import json
-import sys
 import asyncio
 
 def summarize(reviews) -> str:
@@ -53,7 +50,3 @@ def async_summarize(reviews) -> str:
     result = event_loop.run_until_complete(get_msg(messages))
     return result[0].text
 
-# sys.stdout.reconfigure(encoding='utf-8')
-# text  = "1. Хаос в управлении, нужно менять подход.\n"+"2. Всё идеально, улучшать нечего.\n"+"3. Учитывать ,при разработке новых процессов,что системы не доработаны,много ручного труда,усложнение процессов Сначала налаживать технические процессы перед введением в работу\n"
-
-# print(async_summarize(text))
