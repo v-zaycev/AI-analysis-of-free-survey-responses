@@ -1,4 +1,4 @@
-from generate_text import summarize, async_summarize
+from common.generate_text import summarize, async_summarize
 
 class free_collector:
     def __init__(self, default_value):

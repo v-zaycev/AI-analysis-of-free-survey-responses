@@ -1,21 +1,18 @@
-import json
 import copy
 import pandas as pd
-from typing import Optional
-from typing import Union
-from utilities import names_dict, select_collector, number_collector, free_collector, read_survey_structure
-import sys
+from typing import Optional, Union
+from common.names_dict import names_dict
+from common.survey_structure import survey_structure
+from common.mini_collectors.select_collector import select_collector
+from common.mini_collectors.number_collector import number_collector 
+from common.mini_collectors.free_collector import free_collector
 
-class Preprocessing:
+class DataCollector:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
         self.__survey_data = pd.read_excel(data_path)
         self.__names = names_dict(names_path)
-        self.__survey_structure = read_survey_structure(structure_path)
-        self.__questions_to_indexes = dict()
-        
-        for key, value in self.__survey_structure["fields"].items():
-                self.__questions_to_indexes[key] = value
-        self.__create_person_template()
+        self.__survey_structure = survey_structure(structure_path)
+        self.__person_template = self.__survey_structure.create_person_template()
         self.__collector = dict()
 
     def collect(self) -> tuple:
@@ -24,7 +21,7 @@ class Preprocessing:
         questions = self.__survey_structure["fields"]
         for row_index, row in self.__survey_data.iterrows():
             for _, columns in self.__survey_structure["groups"].items():
-                group_structure = self.__create_group_structure(columns)
+                group_structure = self.__survey_structure.create_group_structure(columns)
 
                 valid_flag = True
                 if "check" in group_structure:
@@ -148,7 +145,7 @@ class Preprocessing:
         if group_name not in self.__survey_structure["groups"]:
             return None
 
-        group_structure = self.__create_group_structure(self.__survey_structure["groups"][group_name])
+        group_structure = self.__survey_structure.create_group_structure(self.__survey_structure["groups"][group_name])
         names = list()
         vals = list()
         for index in group_structure["select"]:
@@ -189,27 +186,8 @@ class Preprocessing:
     
     def get_top5(self, criterias : Union[int, list[int]]):
         pass
-    
-    def __create_person_template(self):
-        self.__person_template = dict()
-        for index, info in self.__survey_structure["fields"].items():
-            if index in self.__survey_structure["output headers"]:
-                field_name = self.__survey_structure["output headers"][index]
-            else:
-                field_name = info[1]
 
-            if info[0] == "number":
-                self.__person_template[index] = [field_name, number_collector(self.__survey_structure["empty_value"])] 
-            elif info[0] == "select":
-                self.__person_template[index] = [field_name, select_collector(self.__survey_structure["empty_value"], info)] 
-            elif info[0] == "free":
-                self.__person_template[index] = [field_name, free_collector(self.__survey_structure["empty_value"])]
-    
-    def __create_group_structure(self, columns : list) -> dict:
-        group_structure = dict()
-        for index in columns:
-            if self.__survey_structure["fields"][index][0] not in group_structure:
-                group_structure[self.__survey_structure["fields"][index][0]] = [index]
-            else:
-                group_structure[self.__survey_structure["fields"][index][0]].append(index)
-        return group_structure
+if __name__ == "__main__":
+    import sys
+    sys.stdout.reconfigure(encoding='utf-8')
+    help(DataCollector)
