@@ -1,17 +1,17 @@
 import copy
 import pandas as pd
 from typing import Optional, Union
-from common.names_dict import names_dict
-from common.survey_structure import survey_structure
-from common.mini_collectors.select_collector import select_collector
-from common.mini_collectors.number_collector import number_collector 
-from common.mini_collectors.free_collector import free_collector
+from common.names_dict import NamesDict
+from common.survey_structure import SurveyStructure
+from common.mini_collectors.select_collector import SelectCollector
+from common.mini_collectors.number_collector import NumberCollector 
+from common.mini_collectors.free_collector import FreeCollector
 
 class DataCollector:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
         self.__survey_data = pd.read_excel(data_path)
-        self.__names = names_dict(names_path)
-        self.__survey_structure = survey_structure(structure_path)
+        self.__names = NamesDict(names_path)
+        self.__survey_structure = SurveyStructure(structure_path)
         self.__person_template = self.__survey_structure.create_person_template()
         self.__collector = dict()
 
@@ -82,15 +82,15 @@ class DataCollector:
             for index, info in person_data.items():
                 if index not in columns_numbers:
                     continue
-                if type(info[1]) == select_collector:
+                if type(info[1]) == SelectCollector:
                     cur_row.append(None if info[1].counter == 0 else info[1].answers[1] / info[1].counter)
-                elif type(info[1]) == number_collector:
+                elif type(info[1]) == NumberCollector:
                     cur_row.append(None if info[1].counter == 0 else info[1].sum / info[1].counter)
-                elif type(info[1]) == free_collector:
+                elif type(info[1]) == FreeCollector:
                     cur_row.extend(info[1].get_columns_values())
             if group_name is None and not self.__survey_structure["merge"]:
                 for _, merge_columns in self.__survey_structure["merge"].items():
-                    merge_result = number_collector(self.__survey_structure["empty_value"])
+                    merge_result = NumberCollector(self.__survey_structure["empty_value"])
                     for index in merge_columns:
                         merge_result += self.__collector[name][1]
                     cur_row.append(None if merge_result.counter == 0 else merge_result.sum / merge_result.counter)
@@ -127,7 +127,7 @@ class DataCollector:
             columns_data.extend(info[1].get_columns_values())
         if group_name is None and not self.__survey_structure["merge"]:
             for merge_name, merge_columns in self.__survey_structure["merge"].items():
-                merge_result = number_collector(self.__survey_structure["empty_value"])
+                merge_result = NumberCollector(self.__survey_structure["empty_value"])
                 for index in merge_columns:
                     merge_result += self.__collector[name][1]
             columns_names.extend(merge_result.get_columns_names(merge_name))
@@ -161,22 +161,22 @@ class DataCollector:
         name = candidates[0]
         ratings = list()
         for question_nmb, data in self.__collector[name].items():
-            if type(data[1]) == number_collector:
+            if type(data[1]) == NumberCollector:
                 ratings.append(data[1].get_columns_values())
         return ratings
 
     def get_average_rating(self, columns : Union[int, list[int]]):
         if type(columns) == int:
-            mini_collector = number_collector(self.__survey_structure["empty_value"])
+            mini_collector = NumberCollector(self.__survey_structure["empty_value"])
             for _, stats in self.__collector.items():
                 mini_collector.__iadd__(stats[columns][1])
             return None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter
         else:
-            overall_collector = number_collector(self.__survey_structure["empty_value"])
-            mini_collector = number_collector(self.__survey_structure["empty_value"])
+            overall_collector = NumberCollector(self.__survey_structure["empty_value"])
+            mini_collector = NumberCollector(self.__survey_structure["empty_value"])
             result = dict()
             for column in columns:
-                mini_collector = number_collector(self.__survey_structure["empty_value"])
+                mini_collector = NumberCollector(self.__survey_structure["empty_value"])
                 for _, stats in self.__collector.items():
                     mini_collector.__iadd__(stats[column][1])
                 overall_collector.__iadd__(mini_collector)           

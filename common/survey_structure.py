@@ -1,9 +1,9 @@
 import json
-from common.mini_collectors.number_collector import number_collector
-from common.mini_collectors.select_collector import select_collector 
-from common.mini_collectors.free_collector import free_collector
+from common.mini_collectors.number_collector import NumberCollector
+from common.mini_collectors.select_collector import SelectCollector 
+from common.mini_collectors.free_collector import FreeCollector
 
-class survey_structure:
+class SurveyStructure:
     def __init__(self, file_name : str) -> dict:
         with open(file_name, "r", encoding = "utf-8") as tmp_input:
             self.__survey_structure = json.load(tmp_input)    
@@ -37,9 +37,9 @@ class survey_structure:
                 field_name = info[1]
 
             if info[0] == "number":
-                person_template[index] = [field_name, number_collector(self.__survey_structure["empty_value"])] 
+                person_template[index] = [field_name, NumberCollector(self.__survey_structure["empty_value"])] 
             elif info[0] == "select":
-                person_template[index] = [field_name, select_collector(self.__survey_structure["empty_value"], info)] 
+                person_template[index] = [field_name, SelectCollector(self.__survey_structure["empty_value"], info)] 
             elif info[0] == "free":
-                person_template[index] = [field_name, free_collector(self.__survey_structure["empty_value"])]
+                person_template[index] = [field_name, FreeCollector(self.__survey_structure["empty_value"])]
         return person_template

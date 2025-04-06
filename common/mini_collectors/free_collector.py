@@ -1,6 +1,6 @@
 from common.generate_text import summarize, async_summarize
 
-class free_collector:
+class FreeCollector:
     def __init__(self, default_value):
         self.default_value = default_value
         self.feedback = []

@@ -1,7 +1,7 @@
 import pandas as pd
 import re
 
-class names_dict:
+class NamesDict:
     def __init__(self, filename : str):
         data = pd.read_excel(filename)
         self.__data = dict()

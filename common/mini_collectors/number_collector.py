@@ -1,4 +1,4 @@
-class number_collector:
+class NumberCollector:
     def __init__(self, default_value):
         self.default_value = default_value
         self.sum = 0

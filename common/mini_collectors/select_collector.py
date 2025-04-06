@@ -1,4 +1,4 @@
-class select_collector:
+class SelectCollector:
     def __init__(self, default_value, question_info : dict):
         self.default_value = default_value
         self.question_info = question_info
