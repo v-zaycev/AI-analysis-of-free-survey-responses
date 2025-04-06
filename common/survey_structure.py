@@ -1,5 +1,7 @@
 import json
-from utilities import number_collector, select_collector, free_collector
+from common.mini_collectors import number_collector
+from common.mini_collectors import select_collector
+from common.mini_collectors import free_collector
 
 class survey_structure:
     def __init__(self, file_name : str) -> dict:
