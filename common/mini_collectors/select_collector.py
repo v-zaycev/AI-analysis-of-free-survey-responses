@@ -20,7 +20,8 @@ class SelectCollector:
                 self.answers[self.question_info[2][answer]] += 1
         self.counter += 1
     
-    def get_columns_names(self, field_name :  str) -> list:
+    @staticmethod
+    def get_columns_names(field_name :  str) -> list:
         return [ field_name + "_positive_pct", field_name + "_count"]
     
     def get_columns_values(self) -> list:

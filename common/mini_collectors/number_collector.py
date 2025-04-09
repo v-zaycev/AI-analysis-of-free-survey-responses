@@ -9,7 +9,8 @@ class NumberCollector:
             self.sum += value
             self.counter += 1
 
-    def get_columns_names(self, field_name :  str) -> list:
+    @staticmethod
+    def get_columns_names(field_name :  str) -> list:
         return [ field_name + "_avg", field_name + "_count"]
     
     def get_columns_values(self) -> list:

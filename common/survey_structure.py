@@ -20,6 +20,12 @@ class SurveyStructure:
         return self.__survey_structure[key]
 
     def create_group_structure(self, columns : list) -> dict:
+        """
+        Parameters:
+            columns (list): список столбцов, для которых определяется структура
+        
+        Returns:
+            dict: словарь в котороом ключами являются типы вопросов, а значениями - список номеров вопросов данного типа"""
         group_structure = dict()
         for index in columns:
             if self.__survey_structure["fields"][index][0] not in group_structure:
@@ -28,18 +34,26 @@ class SurveyStructure:
                 group_structure[self.__survey_structure["fields"][index][0]].append(index)
         return group_structure
     
-    def create_person_template(self):
+    def create_person_template(self) -> dict:
+        """
+        Returns:
+            dict: 
+        """
         person_template = dict()
-        for index, info in self.__survey_structure["fields"].items():
-            if index in self.__survey_structure["output headers"]:
-                field_name = self.__survey_structure["output headers"][index]
-            else:
-                field_name = info[1]
+        
+        for _, group in self.__survey_structure["groups"].items():
+            for index in group:
+                info = self.__survey_structure["fields"][index]
+                if index in self.__survey_structure["output headers"]:
+                    field_name = self.__survey_structure["output headers"][index]
+                else:
+                    field_name = info[1]
 
-            if info[0] == "number":
-                person_template[index] = [field_name, NumberCollector(self.__survey_structure["empty_value"])] 
-            elif info[0] == "select":
-                person_template[index] = [field_name, SelectCollector(self.__survey_structure["empty_value"], info)] 
-            elif info[0] == "free":
-                person_template[index] = [field_name, FreeCollector(self.__survey_structure["empty_value"])]
+                if info[0] == "number":
+                    person_template[index] = [field_name, NumberCollector(self.__survey_structure["empty_value"])] 
+                elif info[0] == "select":
+                    person_template[index] = [field_name, SelectCollector(self.__survey_structure["empty_value"], info)] 
+                elif info[0] == "free":
+                    person_template[index] = [field_name, FreeCollector(self.__survey_structure["empty_value"])]
+                    
         return person_template

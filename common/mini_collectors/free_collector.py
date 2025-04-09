@@ -9,7 +9,8 @@ class FreeCollector:
         if value is not None and value != self.default_value and str(value).strip() != "":
             self.feedback.append(str(value))
 
-    def get_columns_names(self, field_name :  str) -> list:
+    @staticmethod
+    def get_columns_names(field_name :  str) -> list:
         return [field_name + "_feedback", field_name + "_count"]
     
     def get_columns_values(self) -> list:

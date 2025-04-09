@@ -9,19 +9,29 @@ from common.mini_collectors.free_collector import FreeCollector
 
 class DataCollector:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
+        """Конструктор класса\n 
+        Agrs:\n
+            data_path: .xlsx файл с результатами опроса\n
+            structure_path: .json файл с описанием опроса\n
+            names_path: .xlsx файл со списком рассматриваемых имён руководителей
+        """
         self.__survey_data = pd.read_excel(data_path)
         self.__names = NamesDict(names_path)
-        self.__survey_structure = SurveyStructure(structure_path)
-        self.__person_template = self.__survey_structure.create_person_template()
+        self.survey_structure = SurveyStructure(structure_path)
+        self.__person_template = self.survey_structure.create_person_template()
         self.__collector = dict()
 
     def collect(self) -> tuple:
+        """Метод выполняющий сбор статистики для различных руководителей\n
+        Returns:
+            tuple: (число неидентифицированных имён, число всех непустых имён)
+        """
         names_counter = 0
         unaccepted_names_counter = 0
-        questions = self.__survey_structure["fields"]
+        questions = self.survey_structure["fields"]
         for row_index, row in self.__survey_data.iterrows():
-            for _, columns in self.__survey_structure["groups"].items():
-                group_structure = self.__survey_structure.create_group_structure(columns)
+            for _, columns in self.survey_structure["groups"].items():
+                group_structure = self.survey_structure.create_group_structure(columns)
 
                 valid_flag = True
                 if "check" in group_structure:
@@ -36,15 +46,16 @@ class DataCollector:
                 name_column_number = group_structure["name"][0]
                 name_column_question = questions[name_column_number][1]
                 raw_name = row[name_column_question].strip()
-                names = self.__names.get_names(raw_name)
                 
-                if (raw_name != self.__survey_structure["empty_value"]):
+                if (raw_name != self.survey_structure["empty_value"]):
                     names_counter += 1
                 else:
                     continue
+
+                names = self.__names.get_names(raw_name)
                 
                 if len(names) != 1:
-                    print(f"row {row_index}: {name_column_question}\n  {raw_name}: {names}")
+                    print(f"row {row_index}: \"{name_column_question}\"\n  {raw_name}: {names}")
                     unaccepted_names_counter += 1
                     continue
                 else:
@@ -60,40 +71,37 @@ class DataCollector:
             
         return (unaccepted_names_counter, names_counter)
 
+    #fix merge
     def create_report_df(self, group_name : Optional[str] = None) -> pd.DataFrame:
         if group_name is None:
-            columns_numbers = sorted(self.__survey_structure["fields"].keys())
-        elif group_name in self.__survey_structure["groups"]:
-            columns_numbers = sorted(self.__survey_structure["groups"][group_name])
+            columns_numbers = sorted(self.survey_structure["fields"].keys())
+        elif group_name in self.survey_structure["groups"]:
+            columns_numbers = sorted(self.survey_structure["groups"][group_name])
         else:
             return None
         
         columns_names = ["Имя"]
         for index in columns_numbers:
             if index in self.__person_template:
-                columns_names.append(self.__person_template[index][0])
-        if group_name is None and not self.__survey_structure["merge"]:
-            for columns_name in self.__survey_structure["merge"].keys():
-                columns_names.append(columns_name)
-        df = pd.DataFrame(columns = columns_names)
+                columns_names.extend(self.__person_template[index][1].get_columns_names(self.__person_template[index][0]))
+
+        if group_name is None and not self.survey_structure["merge"]:
+            for columns_name in self.survey_structure["merge"].keys():
+                columns_names.extend(NumberCollector.get_columns_names(columns_name))
+        df = pd.DataFrame()
 
         for name, person_data in self.__collector.items():
             cur_row = [name]
             for index, info in person_data.items():
                 if index not in columns_numbers:
                     continue
-                if type(info[1]) == SelectCollector:
-                    cur_row.append(None if info[1].counter == 0 else info[1].answers[1] / info[1].counter)
-                elif type(info[1]) == NumberCollector:
-                    cur_row.append(None if info[1].counter == 0 else info[1].sum / info[1].counter)
-                elif type(info[1]) == FreeCollector:
-                    cur_row.extend(info[1].get_columns_values())
-            if group_name is None and not self.__survey_structure["merge"]:
-                for _, merge_columns in self.__survey_structure["merge"].items():
-                    merge_result = NumberCollector(self.__survey_structure["empty_value"])
+                cur_row.extend(info[1].get_columns_values())
+            if group_name is None and not self.survey_structure["merge"]:
+                for _, merge_columns in self.survey_structure["merge"].items():
+                    merge_result = NumberCollector(self.survey_structure["empty_value"])
                     for index in merge_columns:
                         merge_result += self.__collector[name][1]
-                    cur_row.append(None if merge_result.counter == 0 else merge_result.sum / merge_result.counter)
+                    cur_row.extend(merge_result.get_columns_values())
             
             if df.empty:
                 df = pd.DataFrame(data=[cur_row], columns = columns_names)
@@ -102,8 +110,14 @@ class DataCollector:
 
         return df
 
-    def get_person_info(self, name : str, group_name : Optional[str] =  None) -> pd.Series:
-
+    def get_person_report(self, name : str, group_name : Optional[str] =  None) -> Optional[pd.Series]:
+        """Метод возвращающий pandas Series, с набором статистик для каждого вопроса\n
+        Args:
+            name: имя руководителя
+            group_name: тип руководства
+        Заголовком является формулировка вопроса/выходная интерпретация + постфикс для соответствующей статистики.\n
+        Набор статистик зависит от типа вопроса.
+        """
         candidates = self.__names.get_names(name)
         if len(candidates) == 1:
             name = candidates[0]
@@ -111,9 +125,9 @@ class DataCollector:
             return None
             
         if group_name is None:
-            columns_numbers = sorted(self.__survey_structure["fields"].keys())
-        elif group_name in self.__survey_structure["groups"]:
-            columns_numbers = sorted(self.__survey_structure["groups"][group_name])
+            columns_numbers = sorted(self.survey_structure["fields"].keys())
+        elif group_name in self.survey_structure["groups"]:
+            columns_numbers = sorted(self.survey_structure["groups"][group_name])
         else:
             return None
         
@@ -125,9 +139,9 @@ class DataCollector:
                 continue
             columns_names.extend(info[1].get_columns_names(info[0]))
             columns_data.extend(info[1].get_columns_values())
-        if group_name is None and not self.__survey_structure["merge"]:
-            for merge_name, merge_columns in self.__survey_structure["merge"].items():
-                merge_result = NumberCollector(self.__survey_structure["empty_value"])
+        if group_name is None and not self.survey_structure["merge"]:
+            for merge_name, merge_columns in self.survey_structure["merge"].items():
+                merge_result = NumberCollector(self.survey_structure["empty_value"])
                 for index in merge_columns:
                     merge_result += self.__collector[name][1]
             columns_names.extend(merge_result.get_columns_names(merge_name))
@@ -135,17 +149,25 @@ class DataCollector:
 
         return pd.Series(columns_data, index = columns_names)         
 
-    def get_select_vals_for_plot(self, name : str, group_name : str) -> tuple:
+    def get_select_vals_for_plot(self, name : str, group_name : str) -> tuple[list, list]:
+        """
+        Args:
+            name (str): имя руководителя
+            group_name (str): тип руководства
+
+        Returns:
+            tuple: пара списков, где первый содержит интерпретации вопросов,\n
+            а второй - список из доли положительных и отрицательных ответов"""
         candidates = self.__names.get_names(name)
         if len(candidates) == 1:
             name = candidates[0]
         else:
             return None
         
-        if group_name not in self.__survey_structure["groups"]:
+        if group_name not in self.survey_structure["groups"]:
             return None
 
-        group_structure = self.__survey_structure.create_group_structure(self.__survey_structure["groups"][group_name])
+        group_structure = self.survey_structure.create_group_structure(self.survey_structure["groups"][group_name])
         names = list()
         vals = list()
         for index in group_structure["select"]:
@@ -155,6 +177,12 @@ class DataCollector:
         return (names, vals)
 
     def get_person_ratings(self, name : str) -> list:
+        """
+        Args:
+            name (str): имя руководителя
+
+        Returns:
+            list: список пар (средняя оценка, число оценок) для каждого столбца типа number"""
         candidates = self.__names.get_names(name)
         if len(candidates) != 1:
             return None
@@ -166,17 +194,23 @@ class DataCollector:
         return ratings
 
     def get_average_rating(self, columns : Union[int, list[int]]):
+        """
+        Args:
+            name (str): имя руководителя
+
+        Returns:
+            list: список пар (средняя оценка, число оценок) для каждого столбца типа number"""
         if type(columns) == int:
-            mini_collector = NumberCollector(self.__survey_structure["empty_value"])
+            mini_collector = NumberCollector(self.survey_structure["empty_value"])
             for _, stats in self.__collector.items():
                 mini_collector.__iadd__(stats[columns][1])
             return None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter
         else:
-            overall_collector = NumberCollector(self.__survey_structure["empty_value"])
-            mini_collector = NumberCollector(self.__survey_structure["empty_value"])
+            overall_collector = NumberCollector(self.survey_structure["empty_value"])
+            mini_collector = NumberCollector(self.survey_structure["empty_value"])
             result = dict()
             for column in columns:
-                mini_collector = NumberCollector(self.__survey_structure["empty_value"])
+                mini_collector = NumberCollector(self.survey_structure["empty_value"])
                 for _, stats in self.__collector.items():
                     mini_collector.__iadd__(stats[column][1])
                 overall_collector.__iadd__(mini_collector)           
