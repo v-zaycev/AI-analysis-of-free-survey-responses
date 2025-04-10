@@ -87,8 +87,14 @@ class DataCollector:
             return None
         return name
 
-    #fix merge
     def create_report_df(self, group_name : Optional[str] = None) -> pd.DataFrame:
+        """Метод возвращающий pandas DataFrame, с набором статистик для каждого вопроса для каждого руководителя
+        Args:
+            group_name (Optional[str]): тип руководства
+        Returns:
+            Pandas.DataFrame: Заголовками являются формулировки вопросов/выходные интерпретации + постфикс для соответствующей статистики.
+            Набор статистик зависит от типа вопроса.
+        """
         if group_name is None:
             columns_numbers = sorted(self.survey_structure["fields"].keys())
         elif group_name in self.survey_structure["groups"]:
@@ -101,7 +107,7 @@ class DataCollector:
             if index in self.__person_template:
                 columns_names.extend(self.__person_template[index][1].get_columns_names(self.__person_template[index][0]))
 
-        if group_name is None and not self.survey_structure["merge"]:
+        if group_name is None:
             for columns_name in self.survey_structure["merge"].keys():
                 columns_names.extend(NumberCollector.get_columns_names(columns_name))
         df = pd.DataFrame()
@@ -112,11 +118,11 @@ class DataCollector:
                 if index not in columns_numbers:
                     continue
                 cur_row.extend(info[1].get_columns_values())
-            if group_name is None and not self.survey_structure["merge"]:
+            if group_name is None:
                 for _, merge_columns in self.survey_structure["merge"].items():
                     merge_result = NumberCollector(self.survey_structure["empty_value"])
                     for index in merge_columns:
-                        merge_result += self.__collector[name][1]
+                        merge_result.__iadd__(self.__collector[name][index][1])
                     cur_row.extend(merge_result.get_columns_values())
             
             if df.empty:
@@ -131,8 +137,9 @@ class DataCollector:
         Args:
             name: имя руководителя
             group_name: тип руководства
-        Заголовком является формулировка вопроса/выходная интерпретация + постфикс для соответствующей статистики.\n
-        Набор статистик зависит от типа вопроса.
+        Returns:
+            Optional[Pandas.Series]: заголовками являются формулировки вопроса/выходные интерпретации + постфикс для соответствующей статистики.
+            Набор статистик зависит от типа вопроса.
         """
         name = self.contains(name)
         if name is None:
@@ -191,8 +198,7 @@ class DataCollector:
             group_name (str): тип руководства
 
         Returns:
-            tuple: пара списков, где первый содержит интерпретации вопросов,\n
-            а второй - список из доли положительных и отрицательных ответов"""
+            tuple: пара списков, где первый содержит интерпретации вопросов, а второй - список из доли положительных и отрицательных ответов"""
         candidates = self.__names.get_names(name)
         if len(candidates) == 1:
             name = candidates[0]
@@ -253,7 +259,13 @@ class DataCollector:
             result["Overall"] = (None if overall_collector.counter ==0 else overall_collector.sum /overall_collector.counter)
             return result
     
-    def get_top_one_level(self, threshold : int = 1, top : int = 5):
+    def get_top_one_level(self, threshold : int = 1, top : int = 5) -> pd.DataFrame:
+        """Метод формирует рейтинг руководителей только с прямыми подчинёнными
+        Args:
+            threshold (int): минимальное число оценок для учёта в рейтинге
+            top (int): число руководителей в топе
+        Returns:
+            Pandas.DataFrame: таблица со столбцами \"name\", \"rating\""""
         names = list()
         ratings = list()
         for name, data in self.__collector.items():
@@ -262,7 +274,14 @@ class DataCollector:
                 ratings.append(data[4][1].sum / data[4][1].counter)
         return pd.DataFrame(data = {"name" : names, "rating" : ratings}).sort_values(by = ["rating"],ascending = False).reset_index(drop = True)[:top]        
     
-    def get_top_several_levels(self, threshold : int = 1, top : int = 5):
+    def get_top_several_levels(self, threshold : int = 1, top : int = 5) -> dict:
+        """Метод формирует рейтинг руководителей только с несколькими уровнями подчинения
+        Args:
+            threshold (int): минимальное число оценок для учёта в рейтинге
+            top (int): число руководителей в топе
+        Returns:
+            dict: словарь с ключами \"direct\", \"non direct\" и соответствующими pandas DataFrame
+            со столбцами \"name\", \"rating direct\", \"rating non direct\""""
         names = list()
         ratings_direct = list()
         ratings_non_direct = list()
@@ -275,7 +294,12 @@ class DataCollector:
         return {"direct" : result.sort_values(by = ["rating direct"],ascending = False).reset_index(drop = True)[:top],
                 "non direct" : result.sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
     
+    #fix reports usage
     def create_slides(self, name : str, template_path : str):
+        """Метод создаёт слайды из шаблона .pptx презентации
+            Args:
+                name (str): имя руководителя
+                template_path (str): путь к .pptx шаблону"""
         name = self.contains(name)
         if name is None:
             print(f"Name \"{name}\" not found")
