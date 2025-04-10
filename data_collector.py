@@ -6,6 +6,7 @@ from common.survey_structure import SurveyStructure
 from common.mini_collectors.select_collector import SelectCollector
 from common.mini_collectors.number_collector import NumberCollector 
 from common.mini_collectors.free_collector import FreeCollector
+from pptx_utilities import create_slides_one_level, create_slides_two_levels, create_slides_three_levels
 
 class DataCollector:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
@@ -71,6 +72,21 @@ class DataCollector:
             
         return (unaccepted_names_counter, names_counter)
 
+    def contains(self, name : str) -> Optional[str]:
+        """Метод проверяет, есть ли переданное имя среди собранных данных
+        Parameters:
+            name (str): проверяемое имя
+        Returns:
+            Optional (str): если имени соответствует единственная запись, то возвращается имя в той форме,
+            в которой оно записано в сборщике, в противном случае возращается None"""
+        name = self.__names.get_names(name)
+        if len(name) != 1:
+            return None
+        name = name[0]
+        if name not in self.__collector:
+            return None
+        return name
+
     #fix merge
     def create_report_df(self, group_name : Optional[str] = None) -> pd.DataFrame:
         if group_name is None:
@@ -118,10 +134,8 @@ class DataCollector:
         Заголовком является формулировка вопроса/выходная интерпретация + постфикс для соответствующей статистики.\n
         Набор статистик зависит от типа вопроса.
         """
-        candidates = self.__names.get_names(name)
-        if len(candidates) == 1:
-            name = candidates[0]
-        else:
+        name = self.contains(name)
+        if name is None:
             return None
             
         if group_name is None:
@@ -148,6 +162,27 @@ class DataCollector:
             columns_data.extend(merge_result.get_columns_values())
 
         return pd.Series(columns_data, index = columns_names)         
+
+    def get_persons_select(self, name : str, group_name : Optional[str] =  None) -> Optional[pd.Series]:
+        name = self.contains(name)
+        if name is None:
+            return None
+        
+        if group_name is None:
+            columns_numbers = sorted([i for i , data in self.survey_structure["fields"].items() if data[0] == "select" ])
+        elif group_name in self.survey_structure["groups"]:
+            columns_numbers = sorted([i for i in self.survey_structure["groups"][group_name] if (
+                self.survey_structure["fields"][i][0] == "select" )])
+        else:
+            return None
+        
+        person_data = self.__collector[name]
+        columns_names = list()
+        columns_data = list()
+        for i in columns_numbers:
+            pass
+        #!!!!!!!!
+        return pd.Series(columns_data, index = columns_names)  
 
     def get_select_vals_for_plot(self, name : str, group_name : str) -> tuple[list, list]:
         """
@@ -218,10 +253,86 @@ class DataCollector:
             result["Overall"] = (None if overall_collector.counter ==0 else overall_collector.sum /overall_collector.counter)
             return result
     
-    def get_top5(self, criterias : Union[int, list[int]]):
-        pass
+    def get_top_one_level(self, threshold : int = 1, top : int = 5):
+        names = list()
+        ratings = list()
+        for name, data in self.__collector.items():
+            if data[4][1].counter >= threshold and data[11][1].counter == 0 and data[20][1].counter == 0:
+                names.append(name)
+                ratings.append(data[4][1].sum / data[4][1].counter)
+        return pd.DataFrame(data = {"name" : names, "rating" : ratings}).sort_values(by = ["rating"],ascending = False).reset_index(drop = True)[:top]        
+    
+    def get_top_several_levels(self, threshold : int = 1, top : int = 5):
+        names = list()
+        ratings_direct = list()
+        ratings_non_direct = list()
+        for name, data in self.__collector.items():
+            if data[4][1].counter >= threshold and (data[11][1].counter >= threshold or data[20][1].counter >= threshold):
+                names.append(name)
+                ratings_direct.append(data[4][1].sum / data[4][1].counter)
+                ratings_non_direct.append((data[11][1].sum + data[20][1].sum)  / (data[11][1].counter + data[20][1].counter))
+        result =  pd.DataFrame(data = {"name" : names, "rating direct" : ratings_direct, "rating non direct" : ratings_non_direct})
+        return {"direct" : result.sort_values(by = ["rating direct"],ascending = False).reset_index(drop = True)[:top],
+                "non direct" : result.sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
+    
+    def create_slides(self, name : str, template_path : str):
+        name = self.contains(name)
+        if name is None:
+            print(f"Name \"{name}\" not found")
+            return
+        
+        filled_groups = self.__select_filled_groups(name)
+        if len(filled_groups) == 0:
+            print(f"For name \"{name}\" not enough data")
+        elif len(filled_groups) == 1:
+            create_slides_one_level(name, filled_groups[0], self)
+        elif len(filled_groups) == 2:
+            create_slides_two_levels(name, tuple(filled_groups), self)
+        elif len(filled_groups) == 3:
+            create_slides_three_levels(name, filled_groups[0], self)
+            return
 
-if __name__ == "__main__":
-    import sys
-    sys.stdout.reconfigure(encoding='utf-8')
-    help(DataCollector)
+    def __select_filled_groups(self, name : str) -> frozenset[int]:
+        structure = self.__survey_structure
+        valid_groups = list()
+        index = 1
+        for group_name, columns in structure["groups"].items():
+            groups = structure.create_group_structure(columns)
+            counter  = 0 
+            report = self.__get_person_report(name, group_name)
+            for question_nmb in groups["select"]:
+                if question_nmb in structure["output headers"] and report[structure["output headers"][question_nmb] + "_count"] > 0:
+                    counter += 1
+                    continue
+                if question_nmb not in structure["output headers"] and report[structure["questions"][question_nmb][1] + "_count"] > 0:
+                    counter += 1
+            if counter == len(groups["select"]):
+                valid_groups.append(index)
+            index += 1
+        return valid_groups
+
+    def get_areas_of_growth(self) -> dict:
+        overall_collector = copy.deepcopy(self.__person_template)
+        fields  = self.survey_structure["fields"]
+        for _, data in self.__collector.items():
+            for i, collector in data.items():
+                if fields[i][0] == "select":
+                    overall_collector[i][1].__iadd__(collector[1])
+        result = dict()
+        for group_name, group_columns in self.survey_structure["groups"].items():
+            group_structure = self.survey_structure.create_group_structure(group_columns)
+            questions = list()
+            ratings = list()
+            votes = list()
+            for i in group_structure["select"]:
+                questions.append(overall_collector[i][0])
+                tmp = overall_collector[i][1].get_columns_values()
+                ratings.append(tmp[0])
+                votes.append(tmp[1])
+            
+            df = pd.DataFrame(data = {"question": questions, "rating": ratings, "votes": votes})
+            df = df.sort_values(by=["rating"]).reset_index(drop = True)
+            result[group_name] = df
+        return result
+
+    

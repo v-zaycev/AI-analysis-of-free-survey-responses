@@ -14,7 +14,7 @@ class NumberCollector:
         return [ field_name + "_avg", field_name + "_count"]
     
     def get_columns_values(self) -> list:
-        return [0 if self.counter == 0 else self.sum / self.counter, self.counter]
+        return [None if self.counter == 0 else self.sum / self.counter, self.counter]
 
     def __iadd__(self, other):
         self.sum += other.sum

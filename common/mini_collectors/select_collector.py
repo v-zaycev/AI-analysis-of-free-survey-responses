@@ -26,6 +26,11 @@ class SelectCollector:
     
     def get_columns_values(self) -> list:
         if 1 in self.answers:
-            return [0 if self.counter == 0 else self.answers[1] / self.counter,  self.counter]
+            return [None if self.counter == 0 else self.answers[1] / self.counter,  self.counter]
         else:
-            return [0, 0]
+            return [None, 0]
+        
+    def __iadd__(self, other):
+        for i in self.answers.keys():
+            self.answers[i] += other.answers[i]
+        self.counter += other.counter

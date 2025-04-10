@@ -37,7 +37,7 @@ class SurveyStructure:
     def create_person_template(self) -> dict:
         """
         Returns:
-            dict: 
+            dict: ключи - номера вопросов, значения - список из двух элементов: имени поля и mini_collector'а 
         """
         person_template = dict()
         
@@ -55,5 +55,5 @@ class SurveyStructure:
                     person_template[index] = [field_name, SelectCollector(self.__survey_structure["empty_value"], info)] 
                 elif info[0] == "free":
                     person_template[index] = [field_name, FreeCollector(self.__survey_structure["empty_value"])]
-                    
+
         return person_template
