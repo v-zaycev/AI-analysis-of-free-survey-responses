@@ -3,17 +3,14 @@ import pandas as pd
 from typing import Optional, Union
 from common.names_dict import NamesDict
 from common.survey_structure import SurveyStructure
-from common.mini_collectors.select_collector import SelectCollector
 from common.mini_collectors.number_collector import NumberCollector 
-from common.mini_collectors.free_collector import FreeCollector
-from pptx_utilities import create_slides_one_level, create_slides_two_levels, create_slides_three_levels
 
 class DataCollector:
     def __init__(self, data_path : str, structure_path : str, names_path : str):
-        """Конструктор класса\n 
-        Agrs:\n
-            data_path: .xlsx файл с результатами опроса\n
-            structure_path: .json файл с описанием опроса\n
+        """Конструктор класса
+        Parameters:
+            data_path: .xlsx файл с результатами опроса
+            structure_path: .json файл с описанием опроса
             names_path: .xlsx файл со списком рассматриваемых имён руководителей
         """
         self.__survey_data = pd.read_excel(data_path)
@@ -235,20 +232,18 @@ class DataCollector:
         return ratings
 
     def get_average_rating(self, columns : Union[int, list[int]]):
-        """
+        """Метод считает среднюю оценку среди всех респондентов по вопросам с указанными номерами
         Args:
-            name (str): имя руководителя
-
+            columns (int | list[int]): набор вопросов
         Returns:
-            list: список пар (средняя оценка, число оценок) для каждого столбца типа number"""
+            dict | float | None: значение или набор значений для соответствующих формулировок вопросов"""
         if type(columns) == int:
             mini_collector = NumberCollector(self.survey_structure["empty_value"])
             for _, stats in self.__collector.items():
                 mini_collector.__iadd__(stats[columns][1])
-            return None if mini_collector.counter ==0 else mini_collector.sum /mini_collector.counter
+            return None if mini_collector.counter == 0 else mini_collector.sum /mini_collector.counter
         else:
             overall_collector = NumberCollector(self.survey_structure["empty_value"])
-            mini_collector = NumberCollector(self.survey_structure["empty_value"])
             result = dict()
             for column in columns:
                 mini_collector = NumberCollector(self.survey_structure["empty_value"])
@@ -293,47 +288,6 @@ class DataCollector:
         result =  pd.DataFrame(data = {"name" : names, "rating direct" : ratings_direct, "rating non direct" : ratings_non_direct})
         return {"direct" : result.sort_values(by = ["rating direct"],ascending = False).reset_index(drop = True)[:top],
                 "non direct" : result.sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
-    
-    #fix reports usage
-    def create_slides(self, name : str, template_path : str):
-        """Метод создаёт слайды из шаблона .pptx презентации
-            Args:
-                name (str): имя руководителя
-                template_path (str): путь к .pptx шаблону"""
-        name = self.contains(name)
-        if name is None:
-            print(f"Name \"{name}\" not found")
-            return
-        
-        filled_groups = self.__select_filled_groups(name)
-        if len(filled_groups) == 0:
-            print(f"For name \"{name}\" not enough data")
-        elif len(filled_groups) == 1:
-            create_slides_one_level(name, filled_groups[0], self)
-        elif len(filled_groups) == 2:
-            create_slides_two_levels(name, tuple(filled_groups), self)
-        elif len(filled_groups) == 3:
-            create_slides_three_levels(name, filled_groups[0], self)
-            return
-
-    def __select_filled_groups(self, name : str) -> frozenset[int]:
-        structure = self.__survey_structure
-        valid_groups = list()
-        index = 1
-        for group_name, columns in structure["groups"].items():
-            groups = structure.create_group_structure(columns)
-            counter  = 0 
-            report = self.__get_person_report(name, group_name)
-            for question_nmb in groups["select"]:
-                if question_nmb in structure["output headers"] and report[structure["output headers"][question_nmb] + "_count"] > 0:
-                    counter += 1
-                    continue
-                if question_nmb not in structure["output headers"] and report[structure["questions"][question_nmb][1] + "_count"] > 0:
-                    counter += 1
-            if counter == len(groups["select"]):
-                valid_groups.append(index)
-            index += 1
-        return valid_groups
 
     def get_areas_of_growth(self) -> dict:
         overall_collector = copy.deepcopy(self.__person_template)
@@ -358,5 +312,3 @@ class DataCollector:
             df = df.sort_values(by=["rating"]).reset_index(drop = True)
             result[group_name] = df
         return result
-
-    
