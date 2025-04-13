@@ -1,7 +1,8 @@
+import plotly.graph_objects as go
 from data_collector  import DataCollector
 from pptx_utilities import *
-from common.survey_structure import SurveyStructure
-class PptxCollector(DataCollector):
+
+class SlidesCollector(DataCollector):
     def create_slides(self, name : str, template_path : str):
         """Метод создаёт слайды из шаблона .pptx презентации
             Args:
@@ -158,3 +159,78 @@ class PptxCollector(DataCollector):
         update_table_cell(pres.slides[0].shapes[2].table, 1, 4, f"{overall_rating:.2f}")
         
         pres.save(f"outputs\\{name}.pptx")
+
+    def create_plot(self, name : str, group : str):
+        person_stat = self.get_select_vals_for_plot(name, group)
+        colors = ['rgba(168,209,141,0.8)',
+                'rgba(251,114,134,0.8)']
+
+        x_data = person_stat[1]
+        y_data = person_stat[0]
+        fig = go.Figure()
+
+        for i in range(0, len(x_data[0])):
+            for xd, yd in zip(x_data, y_data):
+                fig.add_trace(go.Bar(
+                    x=[xd[i]], y=[yd],
+                    orientation='h',
+                    marker=dict(
+                        color=colors[i],
+                        line=dict(width=0)
+                    )
+                ))
+
+        fig.update_layout(
+            xaxis=dict(
+                showgrid=True,
+                showline=False,
+                tickformat= '0.00%',
+                showticklabels=True,
+                color="white",
+                zeroline=True,
+                domain=[0.15, 1]
+            ),
+            yaxis=dict(
+                showgrid=False,
+                showline=False,
+                showticklabels=False,
+                zeroline=False,
+            ),
+            barmode='stack',
+            paper_bgcolor='rgb(0, 0, 0)',
+            plot_bgcolor='rgb(0, 0, 0)',
+            margin=dict(l=300, r=10, t=140, b=80),
+            showlegend=False,
+        )
+
+        annotations = []
+
+        for yd, xd in zip(y_data, x_data):
+            # labeling the y-axis
+            annotations.append(dict(xref='paper', yref='y',
+                                    x=0.14, y=yd,
+                                    xanchor='right',
+                                    text=str(yd),
+                                    font=dict(family='Arial', size=14,
+                                            color='rgb(255, 255, 255)'),
+                                    showarrow=False, align='right'))
+            # labeling the first percentage of each bar (x_axis)
+            if xd[0]!=0:
+                annotations.append(dict(xref='x', yref='y',
+                                        x=xd[0] / 2, y=yd,
+                                        text=str(int(xd[0]*100)) + '%',
+                                        font=dict(family='Arial', size=14,
+                                                color='rgb(0, 0, 0)'),
+                                        showarrow=False))
+            # labeling the second percentage of each bar (x_axis)
+            if xd[1]!=0:
+                annotations.append(dict(xref='x', yref='y',
+                                        x=xd[0] + (xd[1]/2), y=yd,
+                                        text=str(int(xd[1]*100)) + '%',
+                                        font=dict(family='Arial', size=14,
+                                                    color='rgb(0, 0, 0)'),
+                                        showarrow=False))
+
+        fig.update_layout(annotations=annotations, title=dict(text=group, x=0.5 ,font=dict(size=50, color='rgb(255, 255, 255)')))
+        fig.update_traces(width=0.5)
+        fig.show() 
