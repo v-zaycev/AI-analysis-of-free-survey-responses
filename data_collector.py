@@ -271,12 +271,12 @@ class DataCollector:
     
     def get_top_several_levels(self, threshold : int = 1, top : int = 5) -> dict:
         """Метод формирует рейтинг руководителей только с несколькими уровнями подчинения
-        Args:
+        Parameters:
             threshold (int): минимальное число оценок для учёта в рейтинге
             top (int): число руководителей в топе
         Returns:
             dict: словарь с ключами \"direct\", \"non direct\" и соответствующими pandas DataFrame
-            со столбцами \"name\", \"rating direct\", \"rating non direct\""""
+            со столбцами \"name\", \"rating direct\" или \"rating non direct\""""
         names = list()
         ratings_direct = list()
         ratings_non_direct = list()
@@ -290,6 +290,10 @@ class DataCollector:
                 "non direct" : result.drop(columns=["rating direct"]).sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
 
     def get_areas_of_growth(self) -> dict:
+        """Метод формирует списки зон роста по уровням подчинения
+        Returns:
+            dict: словарь с ключами по типам подчинения и соответствующими pandas DataFrame
+            со столбцами \"question\", \"rating\", \"votes\""""
         overall_collector = copy.deepcopy(self.__person_template)
         fields  = self.survey_structure["fields"]
         for _, data in self.__collector.items():

@@ -7,10 +7,12 @@ class SlidesCollector(DataCollector):
         """Метод создаёт слайды из шаблона .pptx презентации
             Args:
                 name (str): имя руководителя
-                template_path (str): путь к .pptx шаблону"""
+                template_path (str): путь к .pptx шаблону
+        """
+        raw_name = name
         name = self.contains(name)
         if name is None:
-            print(f"Name \"{name}\" not found")
+            print(f"Name \"{raw_name}\" not found")
             return
         
         filled_groups = self.__select_filled_groups(name)
