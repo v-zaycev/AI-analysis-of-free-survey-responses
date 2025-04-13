@@ -74,7 +74,7 @@ class NamesDict:
             if len(name[0]) == 1:
                 first = name[0]
                 middle = None
-                last = name[2]
+                last = name[1]
             elif len(name[1]) == 1:
                 first = name[1]
                 middle = None

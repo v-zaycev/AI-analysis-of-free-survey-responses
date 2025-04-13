@@ -286,8 +286,8 @@ class DataCollector:
                 ratings_direct.append(data[4][1].sum / data[4][1].counter)
                 ratings_non_direct.append((data[11][1].sum + data[20][1].sum)  / (data[11][1].counter + data[20][1].counter))
         result =  pd.DataFrame(data = {"name" : names, "rating direct" : ratings_direct, "rating non direct" : ratings_non_direct})
-        return {"direct" : result.sort_values(by = ["rating direct"],ascending = False).reset_index(drop = True)[:top],
-                "non direct" : result.sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
+        return {"direct" : result.drop(columns=["rating non direct"]).sort_values(by = ["rating direct"],ascending = False).reset_index(drop = True)[:top],
+                "non direct" : result.drop(columns=["rating direct"]).sort_values(by = ["rating non direct"],ascending = False).reset_index(drop = True)[:top]}
 
     def get_areas_of_growth(self) -> dict:
         overall_collector = copy.deepcopy(self.__person_template)
